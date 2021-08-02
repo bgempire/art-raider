@@ -1,0 +1,16 @@
+{
+    "GameName": "Art Raider",
+    "Version": "0.0.1",
+    "MainFile": "Art Raider.blend",
+    "DataFile": "./data.dat",
+    "DataSource": "./data",
+    "DataChunkSize": 32,
+    "Persistent": [
+        "*.bgeconf",
+        "*.sav"
+    ],
+    "Ignore": [
+        "*.pyc",
+        "*.blend1"
+    ]
+}
