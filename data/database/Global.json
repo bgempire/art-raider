@@ -1,0 +1,9 @@
+// Default global configuration
+
+{
+    "Debug" : false,
+    "MouseNative" : false,
+    "ContextFadeSpeed" : 1.0,
+    "BgmFadeSpeed" : 1.0,
+    "ExitKey" : "ESC"
+}

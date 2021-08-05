@@ -1,0 +1,25 @@
+{
+    // General
+    "Yes": "Yes",
+    "No": "No",
+    "Enable" : "Enable",
+    "Disable" : "Disable",
+    "Previous": "Previous",
+    "Next": "Next",
+    "Confirm" : "Confirm",
+    "Cancel" : "Cancel",
+    "Loading" : "Loading...",
+    "SplashScreen": "This an example splash screen text. This screen may contain information about the game studio, copyrights and other relevant information. This an example splash screen text. This screen may contain information about the game studio, copyrights and other relevant information.",
+    
+    // Main menu
+    "MainMenuStart" : "Start",
+    "MainMenuOptions" : "Options",
+    "MainMenuAbout" : "About",
+    "MainMenuQuit" : "Exit",
+    
+    // Options menu
+    "OptionsVolSfx": "Sound:",
+    "OptionsVolSfxDesc": "Set sound effects volume.",
+    "OptionsVolBgm": "Music:",
+    "OptionsVolBgmDesc": "Set background music volume."
+}
