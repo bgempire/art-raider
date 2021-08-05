@@ -10,6 +10,7 @@ PLAYER_CAMERA_SLOW_PARENT = 60.0
 PLAYER_CAMERA_FORWARD = 1
 PLAYER_CAMERA_DISTANCE = 5
 PLAYER_DEFAULT_PROPS = {
+    "Dead" : False,
     "Direction" : "R",
     "Moving" : False,
     "Action" : "",
@@ -18,6 +19,7 @@ PLAYER_ANIMS = {
     "Idle" : (0, 59),
     "Walk" : (70, 89),
     "Use" : (100, 115),
+    "Death" : (120, 145),
 }
 
 
@@ -67,19 +69,24 @@ def setProps(cont):
     keyLeft = bge.logic.keyboard.events[bge.events.AKEY] == 2
     keyRight = bge.logic.keyboard.events[bge.events.DKEY] == 2
     
-    if not own["Action"] and keyUp:
-        own["Action"] = "Use"
-    
-    elif keyLeft and not keyRight:
-        own["Direction"] = "L"
-        own["Moving"] = True
+    if not own["Dead"]:
         
-    elif not keyLeft and keyRight:
-        own["Direction"] = "R"
-        own["Moving"] = True
+        if not own["Action"] and keyUp:
+            own["Action"] = "Use"
         
-    elif not keyLeft and not keyRight or keyLeft and keyRight or own["Action"]:
-        own["Moving"] = False
+        elif keyLeft and not keyRight:
+            own["Direction"] = "L"
+            own["Moving"] = True
+            
+        elif not keyLeft and keyRight:
+            own["Direction"] = "R"
+            own["Moving"] = True
+            
+        elif not keyLeft and not keyRight or keyLeft and keyRight or own["Action"]:
+            own["Moving"] = False
+            
+    else:
+        own["Action"] = "Death"
         
 
 def processAnimation(cont):
@@ -89,29 +96,42 @@ def processAnimation(cont):
     armature = own.childrenRecursive["PlayerArmature"] # type: BL_ArmatureObject
     
     animation = "Idle"
+    actionFrame = int(armature.getActionFrame())
     
-    if not own["Action"]:
+    if not own["Dead"]:
         
-        if own["Moving"]:
-            animation = "Walk"
-        
-        # Invert armature direction
-        if own["Direction"] == "L":
-            armature.localScale.x = -1
-        else:
-            armature.localScale.x = 1
+        if not own["Action"]:
             
-    elif own["Action"] == "Use":
-        actionFrame = int(armature.getActionFrame())
-        frameThreshold = int(PLAYER_ANIMS["Use"][1])
+            if own["Moving"]:
+                animation = "Walk"
+            
+            # Invert armature direction
+            if own["Direction"] == "L":
+                armature.localScale.x = -1
+            else:
+                armature.localScale.x = 1
+                
+        elif own["Action"] == "Use":
+            frameThreshold = int(PLAYER_ANIMS["Use"][1])
+            
+            if actionFrame >= frameThreshold-2 and actionFrame <= frameThreshold:
+                own["Action"] = ""
+            else:
+                animation = "Use"
+                
+    else:
+        animation = "Death"
+        frameThreshold = int(PLAYER_ANIMS["Death"][1])
         
         if actionFrame >= frameThreshold-2 and actionFrame <= frameThreshold:
             own["Action"] = ""
-        else:
-            animation = "Use"
-        
-    animation = PLAYER_ANIMS[animation]
-    armature.playAction("Player", animation[0], animation[1], blendin=2)
+            for obj in own.childrenRecursive:
+                if "DeathStars" in obj.name:
+                    obj.visible = True
+                    
+    if not own["Dead"] or own["Action"]:
+        animation = PLAYER_ANIMS[animation]
+        armature.playAction("Player", animation[0], animation[1], blendin=2)
 
 
 def processMovement(cont):
@@ -124,7 +144,7 @@ def processMovement(cont):
     axis.worldPosition = own.worldPosition
     axis.worldPosition.y -= PLAYER_CAMERA_DISTANCE
     
-    if own["Moving"] and not own["Action"]:
+    if not own["Dead"] and own["Moving"] and not own["Action"]:
         moveVec.x = PLAYER_MOV_SPEED
         
     if own["Direction"] == "L":

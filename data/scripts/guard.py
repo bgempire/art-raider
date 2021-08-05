@@ -5,7 +5,7 @@ from mathutils import Vector
 from random import random
 
 
-DEBUG = 1
+DEBUG = 0
 GUARD_MOV_SPEED = 0.025
 GUARD_CHASE_DISTANCE = 3.0
 GUARD_ATTACK_DISTANCE = 0.75
@@ -79,7 +79,7 @@ def setProps(cont):
                 else:
                     own["Direction"] = "R"
                     
-                if own.getDistanceTo(player) > GUARD_CHASE_DISTANCE:
+                if own.getDistanceTo(player) > GUARD_CHASE_DISTANCE  or player["Dead"]:
                     own["Alerted"] = False
                     exclamation.visible = False
                     
@@ -89,7 +89,7 @@ def setProps(cont):
                 else:
                     own["Moving"] = True
                     
-            elif own.getDistanceTo(player) < GUARD_CHASE_DISTANCE:
+            elif own.getDistanceTo(player) < GUARD_CHASE_DISTANCE and not player["Dead"]:
                 if own["Direction"] == "L" and player.worldPosition.x < own.worldPosition.x \
                 or own["Direction"] == "R" and player.worldPosition.x > own.worldPosition.x:
                     ray = own.rayCast(own.worldPosition + rayVec, own, GUARD_CHASE_DISTANCE, "OBSTACLE")
@@ -103,7 +103,7 @@ def setProps(cont):
                 own["Moving"] = random() > 0.5
                 own["Direction"] = "R" if random() > 0.5 else "L"
                 
-        elif ray[0]:
+        elif ray[0] or player["Dead"]:
             own["Alerted"] = False
             exclamation.visible = False
             own["Direction"] = "R" if own["Direction"] == "L" else "L"
@@ -114,6 +114,7 @@ def processAnimation(cont):
     
     own = cont.owner
     armature = own.childrenRecursive["GuardArmature"] # type: BL_ArmatureObject
+    hitPlayer = cont.sensors["HitPlayer"] # type: KX_TouchSensor
     
     animation = "Idle"
     
@@ -130,9 +131,13 @@ def processAnimation(cont):
             
     elif own["Action"] == "Attack":
         actionFrame = int(armature.getActionFrame())
-        frameThreshold = int(GUARD_ANIMS["Attack"][1])
+        anim = GUARD_ANIMS["Attack"]
         
-        if actionFrame >= frameThreshold-2 and actionFrame <= frameThreshold:
+        if actionFrame >= int(anim[0])+3 and actionFrame <= int(anim[0])+6:
+            if hitPlayer.positive:
+                hitPlayer.hitObject["Dead"] = True
+        
+        if actionFrame >= int(anim[1])-2 and actionFrame <= int(anim[1]):
             own["Action"] = ""
         else:
             animation = "Attack"
