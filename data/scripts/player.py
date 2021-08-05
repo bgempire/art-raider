@@ -2,13 +2,13 @@ import bge
 
 from bge.types import *
 from mathutils import Vector
-from .bgf import DEBUG
 
 
+DEBUG = 0
 PLAYER_MOV_SPEED = 0.05
 PLAYER_CAMERA_SLOW_PARENT = 60.0
-PLAYER_CAMERA_FORWARD = 2
-PLAYER_CAMERA_DISTANCE = 0
+PLAYER_CAMERA_FORWARD = 1
+PLAYER_CAMERA_DISTANCE = 5
 PLAYER_DEFAULT_PROPS = {
     "Direction" : "R",
     "Moving" : False,
@@ -48,6 +48,9 @@ def initPlayer(cont):
     # type: (SCA_PythonController) -> None
     
     own = cont.owner
+    
+    if not "Player" in own.scene:
+        own.scene["Player"] = own
     
     for prop in PLAYER_DEFAULT_PROPS.keys():
         own[prop] = PLAYER_DEFAULT_PROPS[prop]
