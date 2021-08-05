@@ -135,7 +135,11 @@ def processAnimation(cont):
         
         if actionFrame >= int(anim[0])+3 and actionFrame <= int(anim[0])+6:
             if hitPlayer.positive:
-                hitPlayer.hitObject["Dead"] = True
+                
+                if not hitPlayer.hitObject["Dead"]:
+                    hitPlayer.hitObject["Dead"] = True
+                    obj = own.scene.addObject("GuardPow")
+                    obj.worldPosition = hitPlayer.owner.worldPosition
         
         if actionFrame >= int(anim[1])-2 and actionFrame <= int(anim[1]):
             own["Action"] = ""
