@@ -6,8 +6,10 @@ from bge.types import *
 from ast import literal_eval
 from textwrap import wrap
 from math import radians
+from pathlib import Path
+from hashlib import md5
 
-from . import DEBUG
+from . import DEBUG, config, database, state, lang, cache
 from .thirdparty.pyp3rclip import copy, paste
 
 
@@ -43,12 +45,9 @@ INPUT_VALID_CHARS = {
     "PRINTABLE" : string.printable,
 }
 
-config = globalDict["Config"]
-db = globalDict["Database"]
-state = globalDict["State"]
 
 if not hasattr(bge.logic, "widgetHovered"):
-    bge.logic.widgetHovered = None
+    bge.logic.__widgetHovered = None
 
 
 # Controller endpoint
@@ -113,7 +112,7 @@ def mouseCursor(cont):
     
     cursorObj = own.childrenRecursive["MouseCursor"]
     canvasObj = own.childrenRecursive["MouseCursorCanvas"]
-    curWidget = bge.logic.widgetHovered # type: KX_GameObject
+    curWidget = bge.logic.__widgetHovered # type: KX_GameObject
     
     if not group:
         own.endObject()
@@ -223,6 +222,9 @@ def widgetInit(cont):
         
     elif own["WidgetType"] == "Input":
         inputAction(cont, "Init")
+        
+    elif own["WidgetType"] == "Image":
+        imageAction(cont, "Init")
 
 
 def widgetProcessEnabled(cont):
@@ -315,6 +317,7 @@ def clickableSetVisual(cont, state, button=""):
     
     own = cont.owner
     clickableObj = own["ClickableObj"]
+    colorState = state
     other = ""
     
     if own["WidgetType"] == "Checkbox":
@@ -334,10 +337,23 @@ def clickableSetVisual(cont, state, button=""):
     elif own["WidgetType"] == "Input":
         if own["InputEnable"]:
             state = "Click"
+        
+    elif own["WidgetType"] == "Image":
+        if own["Loading"]:
+            state = "Loading"
+        elif not own["Exists"]:
+            state = "NotFound"
+        elif own["ImageMesh"] in range(1, 11):
+            state = str(own["ImageMesh"])
+        else:
+            state = "NotFound"
     
     clickableObj.replaceMesh(own["WidgetType"] + other + state)
-    clickableObj.color = own["Color" + state]
+    clickableObj.color = own["Color" + colorState]
     labelUpdateTextObj(cont, False)
+    
+    if own["WidgetType"] == "Image" and own["ImageMesh"]:
+        imageAction(cont, "LoadImage")
 
 
 def clickableProcess(cont):
@@ -350,10 +366,10 @@ def clickableProcess(cont):
     
     # Used by mouse cursor
     if mouseOver.positive:
-        bge.logic.widgetHovered = own
+        bge.logic.__widgetHovered = own
         state["Description"] = _getTextFromGroup(cont, True)
-    elif bge.logic.widgetHovered is own:
-        bge.logic.widgetHovered = None
+    elif bge.logic.__widgetHovered is own:
+        bge.logic.__widgetHovered = None
         state["Description"] = ""
     
     if own["WidgetType"] == "Checkbox":
@@ -678,6 +694,67 @@ def inputAction(cont, event):
                 if DEBUG: print("X Input", group, "couldn't set to target:", target)
 
 
+def imageAction(cont, event):
+    # type: (SCA_PythonController, str) -> None
+    
+    own = cont.owner
+    group = own.groupObject
+    
+    # Set image widget properties
+    if event == "Init":
+        DEBUG = 1
+        IMAGE_DEFAULT_PROPS = {
+            "ImageMesh" : 1,
+            "ImagePath" : "",
+            "ImagePathTarget" : "",
+            "Exists" : False,
+            "Loading" : False,
+        }
+        for prop in IMAGE_DEFAULT_PROPS.keys():
+            own[prop] = IMAGE_DEFAULT_PROPS[prop]
+            if DEBUG: own.addDebugProperty(prop)
+        
+    # Get image file and ensure if it exists locally
+    if "Image" in group and group["Image"]:
+        imagePath = str(group["Image"])
+        
+        # Process image from external URL
+        if imagePath.startswith(("http:", "https:", "ftp:")):
+            imagePath = imagePath.replace("\\", "")
+            pathHash = md5(imagePath.encode()).hexdigest()
+            
+            # Request image from URL and enable image loading
+            if not own["Loading"] and not pathHash in cache.keys():
+                own["Loading"] = True
+                bge.logic.__requests[pathHash] = [None, "Cache", imagePath]
+                
+            else:
+                imagePath = Path(cache[pathHash])
+                
+                if imagePath.exists():
+                    own["Loading"] = False
+                    own["ImagePathTarget"] = imagePath.as_posix()
+                    print("> Cached image:", imagePath)
+                else:
+                    own["ImagePathTarget"] = ""
+                    print("X Cached image do not exist:", imagePath)
+            
+        # Process local image
+        else:
+            imagePath = Path(bge.logic.expandPath("//" + imagePath))
+            
+            if imagePath.exists():
+                own["ImagePath"] = imagePath.as_posix()
+                print("> Relative image:", imagePath)
+            else:
+                own["ImagePath"] = ""
+                print("X Image do not exist:", imagePath)
+                
+    if event == "LoadImage":
+        clicakbleObj = own["ClickableObj"] # type: KX_GameObject
+        print(clicakbleObj)
+
+
 # Helper functions
 def _getPropsFromDb(cont):
     # type: (SCA_PythonController) -> str
@@ -686,7 +763,7 @@ def _getPropsFromDb(cont):
     group = own.groupObject
     debugProps = True if "Debug" in group and group["Debug"] else False
     
-    widgetDb = globalDict["Database"]["Gui"][own["WidgetType"]] # type: dict
+    widgetDb = database["Gui"][own["WidgetType"]] # type: dict
     own["InlineProps"] = []
     
     for prop in widgetDb.keys():
@@ -710,11 +787,11 @@ def _getPropsFromDb(cont):
         styleName = str(group["Style"])
         styleDb = {}
         
-        if styleName in globalDict["Database"]["Styles"].keys():
-            styleDb = globalDict["Database"]["Styles"][styleName]
+        if styleName in database["Styles"].keys():
+            styleDb = database["Styles"][styleName]
         
-        elif styleName in globalDict["Database"]["Gui"].keys():
-            styleDb = globalDict["Database"]["Gui"][styleName]
+        elif styleName in database["Gui"].keys():
+            styleDb = database["Gui"][styleName]
             
         for prop in styleDb.keys():
             if not prop in own["InlineProps"] and prop in own:
@@ -726,7 +803,7 @@ def _getTextFromGroup(cont, description=False):
     
     own = cont.owner
     group = own.groupObject
-    curLang = globalDict["Lang"][config["Lang"]]
+    curLang = lang[config["Lang"]]
     labelSource = "Label" if not description else "Description"
     
     label = str(group[labelSource]).strip() if labelSource in group else ""
@@ -861,7 +938,6 @@ def _execCommands(cont, instant):
     
     own = cont.owner
     group = own.groupObject
-    config = globalDict["Config"]
     index = 0 if instant else 1
     
     if DEBUG and len(own["Commands"][index]) > 0: print("> Exec commands of", group)
