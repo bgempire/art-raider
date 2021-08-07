@@ -1,5 +1,7 @@
 // Default framework state such as GUI description, if mouse focusing widget, etc
 
 {
-    "Description" : ""
+    "Description" : "",
+    "ItemsCollected" : 0,
+    "ItemsTotal" : 0
 }

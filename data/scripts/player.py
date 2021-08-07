@@ -1,10 +1,14 @@
 import bge
 
 from bge.types import *
+from bge.logic import KX_ACTION_MODE_PLAY as PLAY, KX_ACTION_MODE_LOOP as LOOP
 from mathutils import Vector
+from .bgf import state
 
 
 DEBUG = 0
+PLAYER_COLLISION_DOOR_DISTANCE = 0.5
+PLAYER_COLLISION_ITEM_DISTANCE = 1.0
 PLAYER_MOV_SPEED = 0.05
 PLAYER_CAMERA_SLOW_PARENT = 60.0
 PLAYER_CAMERA_FORWARD = 1
@@ -16,16 +20,16 @@ PLAYER_DEFAULT_PROPS = {
     "Action" : "",
 }
 PLAYER_ANIMS = {
-    "Idle" : (0, 59),
-    "Walk" : (70, 89),
-    "Use" : (100, 115),
-    "Death" : (120, 145),
-    "StairsUpRight" : (150, 177),
-    "StairsDownRight" : (180, 207),
-    "StairsUpLeft" : (210, 237),
-    "StairsDownLeft" : (240, 267),
-    "StairsEvenRight" : (270, 297),
-    "StairsEvenLeft" : (300, 327),
+    "Idle" : (0, 59, LOOP),
+    "Walk" : (70, 89, LOOP),
+    "Use" : (100, 115, PLAY),
+    "Death" : (120, 145, PLAY),
+    "StairsUpRight" : (150, 177, PLAY),
+    "StairsDownRight" : (180, 207, PLAY),
+    "StairsUpLeft" : (210, 237, PLAY),
+    "StairsDownLeft" : (240, 267, PLAY),
+    "StairsEvenRight" : (270, 297, PLAY),
+    "StairsEvenLeft" : (300, 327, PLAY),
 }
 
 
@@ -75,6 +79,7 @@ def setProps(cont):
     
     own = cont.owner
     door = own.scene["DoorCollided"] # type: KX_GameObject
+    item = own.scene["ItemCollided"] # type: KX_GameObject
     
     keyUp = bge.logic.keyboard.events[bge.events.WKEY] == 1
     keyDown = bge.logic.keyboard.events[bge.events.SKEY] == 2
@@ -84,12 +89,22 @@ def setProps(cont):
     if not own["Dead"] and not own["Action"].startswith("Door"):
         
         if keyUp and not own["Action"]:
-            if door and door["Valid"] and own.getDistanceTo(door) < 0.5:
+            if door and door["Valid"] and own.getDistanceTo(door) < PLAYER_COLLISION_DOOR_DISTANCE:
                 own.worldPosition = door.worldPosition
                 own["Action"] = "DoorIn"
                 own["Direction"] = "L" if door["DirectionH"] == "Left" else "R"
             else:
                 own["Action"] = "Use"
+                
+                if item and item["Valid"] and own.getDistanceTo(item) < PLAYER_COLLISION_ITEM_DISTANCE:
+                    item["Valid"] = False
+                    state["ItemsCollected"] += 1
+                    
+                    for obj in item.groupObject.groupMembers:
+                        if "ITEM_MESH" in obj:
+                            obj.visible = False
+                            own.scene.addObject("ItemPlus1", obj, 60)
+                            break
         
         elif not own["Action"] and keyLeft and not keyRight:
             own["Direction"] = "L"
@@ -105,7 +120,7 @@ def setProps(cont):
     elif own["Action"] == "Door":
         print("Door transition")
             
-    if own["Dead"]:
+    if own["Dead"] and not "DeathPlayed" in own:
         own["Action"] = "Death"
         
 
@@ -137,6 +152,11 @@ def processAnimation(cont):
             
             if actionFrame >= frameThreshold-2 and actionFrame <= frameThreshold:
                 own["Action"] = ""
+                
+                if state["ItemsTotal"] > 0 and state["ItemsCollected"] == state["ItemsTotal"]:
+                    own["Action"] = "Cleared"
+                    win = own.scene.addObject("PlayerWin", own, 60) # type: KX_GameObject
+                    win.worldPosition.z += 0.8
             else:
                 animation = "Use"
                 
@@ -168,20 +188,22 @@ def processAnimation(cont):
             animation = "Walk"
                 
     else:
-        animation = "Death"
+        animation = "Death" if not "DeathPlayed" in own else ""
+        
         frameThreshold = int(PLAYER_ANIMS["Death"][1])
         
         if actionFrame >= frameThreshold-2 and actionFrame <= frameThreshold:
             own["Action"] = ""
+            own["DeathPlayed"] = True
             for obj in own.childrenRecursive:
                 if "DeathStars" in obj.name:
                     obj.visible = True
                     
-    if not own["Dead"] or own["Action"]:
+    if animation in PLAYER_ANIMS.keys() and (not own["Dead"] or own["Action"]):
         animation = PLAYER_ANIMS[animation]
         armature.playAction(
             "Player", animation[0], animation[1], 
-            blendin=2, play_mode=bge.logic.KX_ACTION_MODE_LOOP
+            blendin=2, play_mode=animation[2]
         )
 
 
@@ -215,9 +237,13 @@ def _initScenery(cont):
     own = cont.owner
     scene = own.scene
     scene["Doors"] = doors = scene["Doors"] if "Doors" in scene else {}
+    scene["Items"] = items = scene["Items"] if "Items" in scene else {}
     scene["DoorCollided"] = scene["DoorCollided"] if "DoorCollided" in scene else None
+    scene["ItemCollided"] = scene["ItemCollided"] if "ItemCollided" in scene else None
     
     for obj in own.scene.objects:
+        obj = obj # type: KX_GameObject
+        
         if "DOOR" in obj:
             obj["Valid"] = False
             
@@ -226,6 +252,21 @@ def _initScenery(cont):
                     doors[obj.groupObject["Door"]] = [obj]
                 else:
                     doors[obj.groupObject["Door"]].append(obj)
+                    
+        elif "ITEM" in obj:
+            obj["Valid"] = False
+            
+            if obj.groupObject and "Item" in obj.groupObject and obj.groupObject["Item"] in range(1, 6):
+                
+                for member in obj.groupObject.groupMembers:
+                    member = member # type: KX_GameObject
+                    
+                    if "ITEM_MESH" in member:
+                        state["ItemsTotal"] += 1
+                        obj["Valid"] = True
+                        member.replaceMesh("Item" + str(obj.groupObject["Item"]))
+                        member.visible = True
+                        break
                 
     doorsKeys = tuple(doors.keys())
     for door in doorsKeys:
@@ -266,3 +307,6 @@ def _collision(obj, point, normal):
     
     if "DOOR" in obj and obj["Valid"]:
         obj.scene["DoorCollided"] = obj
+    
+    elif "ITEM" in obj and obj["Valid"]:
+        obj.scene["ItemCollided"] = obj
