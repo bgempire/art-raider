@@ -102,7 +102,8 @@ def setProps(cont):
                     for obj in item.groupObject.groupMembers:
                         if "ITEM_MESH" in obj:
                             obj.visible = False
-                            own.scene.addObject("ItemPlus1", obj, 60)
+                            plus = own.scene.addObject("ItemPlus1", obj, 60) # type: KX_GameObject
+                            plus.worldPosition.y -= 1.0
                             break
         
         elif not own["Action"] and keyLeft and not keyRight:
@@ -155,7 +156,7 @@ def processAnimation(cont):
                 if state["ItemsTotal"] > 0 and state["ItemsCollected"] == state["ItemsTotal"]:
                     own["Action"] = "Cleared"
                     win = own.scene.addObject("PlayerWin", own, 60) # type: KX_GameObject
-                    win.worldPosition.z += 0.8
+                    win.worldPosition.z += 1.2
             else:
                 animation = "Use"
                 
