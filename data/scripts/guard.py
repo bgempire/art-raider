@@ -7,7 +7,7 @@ from random import random
 
 DEBUG = 0
 GUARD_MOV_SPEED = 0.025
-GUARD_CHASE_DISTANCE = 3.0
+GUARD_CHASE_DISTANCE = 5.0
 GUARD_ATTACK_DISTANCE = 0.75
 GUARD_ACTION_INTERVAL = 2.0
 GUARD_DEFAULT_PROPS = {
@@ -48,6 +48,9 @@ def initGuard(cont):
     # type: (SCA_PythonController) -> None
     
     own = cont.owner
+    hitPlayer = own.childrenRecursive["HitPlayer"] # type: KX_GameObject
+    
+    hitPlayer["Damage"] = False
     
     for prop in GUARD_DEFAULT_PROPS.keys():
         own[prop] = GUARD_DEFAULT_PROPS[prop]
@@ -71,6 +74,10 @@ def setProps(cont):
             
         ray = own.rayCast(own.worldPosition + rayVec, own, 1, "OBSTACLE")
         
+        if player.isSuspendDynamics:
+            own["Alerted"] = False
+            exclamation.visible = False
+        
         if not ray[0]:
             if own["Alerted"]:
                 
@@ -79,7 +86,7 @@ def setProps(cont):
                 else:
                     own["Direction"] = "R"
                     
-                if own.getDistanceTo(player) > GUARD_CHASE_DISTANCE  or player["Dead"]:
+                if own.getDistanceTo(player) > GUARD_CHASE_DISTANCE or player["Dead"]:
                     own["Alerted"] = False
                     exclamation.visible = False
                     
@@ -89,12 +96,13 @@ def setProps(cont):
                 else:
                     own["Moving"] = True
                     
-            elif own.getDistanceTo(player) < GUARD_CHASE_DISTANCE and not player["Dead"]:
+            elif not player["Dead"] and own.getDistanceTo(player) < GUARD_CHASE_DISTANCE \
+            and int(player.worldPosition.z // 2) == int(own.worldPosition.z // 2):
                 if own["Direction"] == "L" and player.worldPosition.x < own.worldPosition.x \
                 or own["Direction"] == "R" and player.worldPosition.x > own.worldPosition.x:
                     ray = own.rayCast(own.worldPosition + rayVec, own, GUARD_CHASE_DISTANCE, "OBSTACLE")
                     
-                    if not ray[0]:
+                    if not ray[0] and not player.isSuspendDynamics:
                         own["Alerted"] = True
                         exclamation.visible = True
             
@@ -103,7 +111,7 @@ def setProps(cont):
                 own["Moving"] = random() > 0.5
                 own["Direction"] = "R" if random() > 0.5 else "L"
                 
-        elif ray[0] or player["Dead"]:
+        elif ray[0] or player["Dead"] or player.isSuspendDynamics:
             own["Alerted"] = False
             exclamation.visible = False
             own["Direction"] = "R" if own["Direction"] == "L" else "L"
@@ -114,7 +122,7 @@ def processAnimation(cont):
     
     own = cont.owner
     armature = own.childrenRecursive["GuardArmature"] # type: BL_ArmatureObject
-    hitPlayer = cont.sensors["HitPlayer"] # type: KX_TouchSensor
+    hitPlayer = own.childrenRecursive["HitPlayer"] # type: KX_GameObject
     
     animation = "Idle"
     
@@ -134,15 +142,11 @@ def processAnimation(cont):
         anim = GUARD_ANIMS["Attack"]
         
         if actionFrame >= int(anim[0])+3 and actionFrame <= int(anim[0])+6:
-            if hitPlayer.positive:
-                
-                if not hitPlayer.hitObject["Dead"]:
-                    hitPlayer.hitObject["Dead"] = True
-                    obj = own.scene.addObject("GuardPow")
-                    obj.worldPosition = hitPlayer.owner.worldPosition
+            hitPlayer["Damage"] = True
         
         if actionFrame >= int(anim[1])-2 and actionFrame <= int(anim[1]):
             own["Action"] = ""
+            hitPlayer["Damage"] = False
         else:
             animation = "Attack"
         

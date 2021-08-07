@@ -82,7 +82,6 @@ def setProps(cont):
     item = own.scene["ItemCollided"] # type: KX_GameObject
     
     keyUp = bge.logic.keyboard.events[bge.events.WKEY] == 1
-    keyDown = bge.logic.keyboard.events[bge.events.SKEY] == 2
     keyLeft = bge.logic.keyboard.events[bge.events.AKEY] == 2
     keyRight = bge.logic.keyboard.events[bge.events.DKEY] == 2
     
@@ -305,8 +304,16 @@ def _initScenery(cont):
 def _collision(obj, point, normal):
     # type: (KX_GameObject, Vector, Vector) -> None
     
+    player = obj.scene["Player"] # type: KX_GameObject
+    
     if "DOOR" in obj and obj["Valid"]:
         obj.scene["DoorCollided"] = obj
     
     elif "ITEM" in obj and obj["Valid"]:
         obj.scene["ItemCollided"] = obj
+    
+    elif "DAMAGE" in obj and obj["Damage"] and not player["Dead"]:
+        player["Dead"] = True
+        powObj = obj.scene.addObject("GuardPow") # type: KX_GameObject
+        powObj.worldPosition = point
+        powObj.worldPosition.y -= 0.5
