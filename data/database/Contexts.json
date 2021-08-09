@@ -8,7 +8,7 @@
 {
     // Splash screen
     "SplashScreen": {
-        "Default": true,
+        "Default": false,
         "Scenes": [
             {
                 "Name": "ScnIntro",
@@ -37,16 +37,27 @@
     },
     
     // Game, in-game and pause menu GUI
-    "Game": {
-        "Bgm": "SomedayCoyoteHearing",
-        "Loading": "ScnLoading",
+    "Level1": {
+        "Default" : true,
         "Scenes": [
             {
-                "Name": "ScnGameMap",
-                "Pausable": false
-            },
+                "Name": "Level1",
+                "Pausable": true
+            }
+        ]
+    },
+    "Level2": {
+        "Scenes": [
             {
-                "Name": "ScnGame",
+                "Name": "Level2",
+                "Pausable": true
+            }
+        ]
+    },
+    "Level3": {
+        "Scenes": [
+            {
+                "Name": "Level3",
                 "Pausable": true
             }
         ]

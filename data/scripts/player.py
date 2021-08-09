@@ -3,7 +3,7 @@ import bge
 from bge.types import *
 from bge.logic import KX_ACTION_MODE_PLAY as PLAY, KX_ACTION_MODE_LOOP as LOOP
 from mathutils import Vector
-from .bgf import state
+from .bgf import state, database
 
 
 DEBUG = 0
@@ -157,6 +157,9 @@ def processAnimation(cont):
                     own["Action"] = "Cleared"
                     win = own.scene.addObject("PlayerWin", own, 60) # type: KX_GameObject
                     win.worldPosition.z += 1.2
+                    
+                    if "NextLevel" in own.groupObject and own.groupObject["NextLevel"] in database["Contexts"].keys():
+                        own.sendMessage("SetContext", own.groupObject["NextLevel"])
             else:
                 animation = "Use"
                 
@@ -193,6 +196,7 @@ def processAnimation(cont):
         frameThreshold = int(PLAYER_ANIMS["Death"][1])
         
         if actionFrame >= frameThreshold-2 and actionFrame <= frameThreshold:
+            own.sendMessage("SetContext", own.scene.name)
             own["Action"] = ""
             own["DeathPlayed"] = True
             for obj in own.childrenRecursive:
